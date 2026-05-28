@@ -1,0 +1,89 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --brand:        #FF4118;
+  --brand-warm:   #FF6A45;
+  --brand-deep:   #C92D0B;
+  --brand-glow:   rgba(255, 65, 24, 0.22);
+  --ink:          #0B0B0F;
+  --ink-2:        #18181D;
+  --paper:        #F7F4EE;
+  --paper-2:      #EEEAE0;
+  --green:        #1B9C5A;
+  --amber:        #C68A12;
+  --line:         rgba(11,11,15,0.10);
+  --line-strong:  rgba(11,11,15,0.22);
+  --line-dark:    rgba(255,255,255,0.10);
+  --line-dark-2:  rgba(255,255,255,0.18);
+  --muted:        rgba(11,11,15,0.58);
+  --muted-dark:   rgba(255,255,255,0.62);
+  --rose-soft:    #FAE2DA;
+
+  --background: var(--paper);
+  --foreground: var(--ink);
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  /* Typography utility classes */
+  .serif {
+    font-family: var(--font-instrument-serif);
+    font-style: italic;
+  }
+
+  .mono {
+    font-family: var(--font-jetbrains-mono);
+  }
+}
+
+@layer components {
+  /* Buttons */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 border border-transparent px-[18px] h-11 rounded-full text-sm font-medium tracking-[-0.01em] cursor-pointer no-underline whitespace-nowrap transition-all duration-150;
+  }
+  .btn:active { transform: translateY(1px); }
+  .btn-primary { @apply bg-brand text-white hover:bg-brand-deep; }
+  .btn-ink     { @apply bg-ink text-white hover:bg-[#18181D]; }
+  .btn-paper   { @apply bg-white text-ink border-line hover:border-[rgba(11,11,15,0.22)]; }
+  .btn-ghost   { @apply bg-transparent text-ink; }
+  .btn-sm      { @apply h-9 px-[14px] text-[13px]; }
+  .btn-lg      { @apply h-[52px] px-[22px] text-[15px]; }
+
+  /* Inputs */
+  .input {
+    @apply block w-full h-12 px-[14px] rounded-xl border border-line bg-white text-sm text-ink outline-none focus:border-ink;
+  }
+  textarea.input { @apply h-auto py-[14px] min-h-[80px] resize-y; }
+
+  /* Label eyebrow */
+  .label-eyebrow {
+    @apply text-[11px] tracking-[0.08em] uppercase text-[var(--muted)] font-medium;
+  }
+
+  /* Card */
+  .card {
+    @apply bg-white border border-line rounded-[18px] p-[22px];
+  }
+  .card.ink {
+    @apply bg-ink text-white border-[rgba(255,255,255,0.18)];
+  }
+
+  /* Pills */
+  .pill {
+    @apply inline-flex items-center gap-1.5 h-[26px] px-[10px] rounded-full text-xs font-medium bg-paper-2 text-ink border border-line;
+  }
+  .pill.brand { @apply bg-[rgba(255,65,24,0.10)] text-brand-deep border-[rgba(255,65,24,0.20)]; }
+  .pill.green { @apply bg-[#E2F2E9] text-green border-transparent; }
+  .pill.amber { @apply bg-[#F6ECD2] text-amber border-transparent; }
+  .pill.dark  { @apply bg-ink text-white border-transparent; }
+}
