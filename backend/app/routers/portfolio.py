@@ -127,6 +127,28 @@ async def upload_portfolio_item(
     )
 
 
+@router.get("", response_model=list[PortfolioItemResponse])
+def get_my_portfolio_items(
+    current_user: User = Depends(get_current_creator),
+    db: Session = Depends(get_db),
+):
+    items = db.query(PortfolioItem).filter(
+        PortfolioItem.creator_id == current_user.id,
+    ).order_by(PortfolioItem.sort_order).all()
+    return [
+        PortfolioItemResponse(
+            id=str(item.id),
+            title=item.title,
+            kind=item.kind,
+            url=item.url,
+            thumbnail_url=item.thumbnail_url,
+            meta=item.meta,
+            sort_order=item.sort_order,
+        )
+        for item in items
+    ]
+
+
 @router.delete("/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_portfolio_item(
     item_id: str,

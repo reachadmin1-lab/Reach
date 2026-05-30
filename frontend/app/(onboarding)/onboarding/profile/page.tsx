@@ -10,14 +10,23 @@ import { createClient } from "@/lib/supabase/client";
 
 const MAX_BIO = 300;
 
+interface ProgressResponse {
+  display_name: string | null;
+  bio: string | null;
+  avatar_url: string | null;
+  cover_url: string | null;
+}
+
 export default function ProfileStep() {
   const router = useRouter();
   const [displayName, setDisplayName] = useState("");
+  const [handle, setHandle] = useState("");
   const [bio, setBio] = useState("");
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [sessionReady, setSessionReady] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
   const avatarRef = useRef<HTMLInputElement>(null);
   const coverRef = useRef<HTMLInputElement>(null);
 
@@ -33,6 +42,8 @@ export default function ProfileStep() {
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
           async (event, session) => {
             if (session) {
+              setDisplayName(String(session.user.user_metadata?.handle ?? ""));
+              setHandle(String(session.user.user_metadata?.handle ?? ""));
               await syncUser(session.access_token, session.user);
               setSessionReady(true);
               subscription.unsubscribe();
@@ -41,6 +52,8 @@ export default function ProfileStep() {
         );
         return;
       }
+      setDisplayName(String(data.session.user.user_metadata?.handle ?? ""));
+      setHandle(String(data.session.user.user_metadata?.handle ?? ""));
       await syncUser(data.session.access_token, data.session.user);
       setSessionReady(true);
     }
@@ -68,11 +81,44 @@ export default function ProfileStep() {
     initSession();
   }, []);
 
+  useEffect(() => {
+    if (!sessionReady) return;
+
+    async function hydrateFromBackend() {
+      try {
+        const progress = await api.get<ProgressResponse>("/onboarding/progress");
+        const savedDisplayName = String(progress.display_name ?? "").trim();
+        const savedBio = String(progress.bio ?? "");
+        const savedAvatar = String(progress.avatar_url ?? "").trim();
+        const savedCover = String(progress.cover_url ?? "").trim();
+
+        if (savedDisplayName) {
+          setDisplayName(savedDisplayName);
+        }
+        if (savedBio) {
+          setBio(savedBio);
+        }
+        if (savedAvatar) {
+          setAvatarPreview(savedAvatar);
+        }
+        if (savedCover) {
+          setCoverPreview(savedCover);
+        }
+      } catch {
+        // Keep local defaults when backend draft is empty/unavailable
+      } finally {
+        setHydrated(true);
+      }
+    }
+
+    void hydrateFromBackend();
+  }, [sessionReady]);
+
   // Auto-save on field change — only when session is confirmed
   useAutoSave(
     "/onboarding/profile",
-    { display_name: displayName, bio },
-    sessionReady && !!(displayName || bio)
+    { display_name: displayName, handle, bio },
+    sessionReady && hydrated && !!(displayName || bio || handle)
   );
 
   const canContinue = displayName.trim().length > 0 && bio.trim().length > 0;
@@ -98,104 +144,126 @@ export default function ProfileStep() {
   }
 
   async function handleContinue() {
-    await api.patch("/onboarding/profile", { display_name: displayName, bio });
+    await api.patch("/onboarding/profile", { display_name: displayName, handle, bio });
     router.push("/onboarding/platforms");
   }
+
+  const handleSlug = handle.trim().toLowerCase().replace(/\s+/g, ".");
+  const canShowHandleStatus = handleSlug.length > 0;
 
   return (
     <div className="flex flex-col flex-1">
       <StepHeader
         step={1}
         total={7}
-        title="Set up your profile"
-        subtitle="This is what brands will see when they visit your page."
+        title="Tell brands who you are."
+        subtitle="The basics: avatar, your name, a one-line bio. You can edit any of this later."
       />
 
-      <div className="flex-1 max-w-2xl mx-auto w-full px-6 pb-6 flex flex-col gap-6">
-        {/* Cover image */}
-        <div
-          className="relative h-32 rounded-2xl overflow-hidden bg-[var(--paper-2)] border border-line cursor-pointer group"
-          onClick={() => coverRef.current?.click()}
-        >
-          {coverPreview ? (
-            <img src={coverPreview} alt="Cover" className="w-full h-full object-cover" />
-          ) : (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-[var(--muted)]">
-                <rect x="3" y="3" width="18" height="18" rx="3"/>
-                <circle cx="8.5" cy="8.5" r="1.5"/>
-                <path d="m21 15-5-5L5 21"/>
-              </svg>
-              <span className="text-xs text-[var(--muted)]">Add cover photo</span>
+      <div className="flex-1 max-w-6xl mx-auto w-full px-6 pb-8 grid grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)] gap-10">
+        <div className="space-y-6">
+          <div>
+            <p className="label-eyebrow mb-2">Profile photo</p>
+            <div className="border border-dashed border-line rounded-2xl p-5 bg-[var(--paper)] min-h-[238px] flex flex-col items-center justify-center">
+              <button
+                type="button"
+                className="relative w-24 h-24 rounded-full bg-[var(--brand)] overflow-hidden mb-4 flex items-center justify-center text-white text-4xl font-semibold"
+                onClick={() => avatarRef.current?.click()}
+              >
+                {avatarPreview ? (
+                  <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
+                ) : (
+                  <span>{displayName.trim().slice(0, 2).toUpperCase() || "MK"}</span>
+                )}
+              </button>
+              <button type="button" className="btn btn-paper btn-sm" onClick={() => avatarRef.current?.click()}>
+                Upload photo
+              </button>
+              <p className="text-[10px] tracking-[0.08em] uppercase text-[var(--muted)] mt-3">JPG PNG 400x400+</p>
+              <input ref={avatarRef} type="file" accept="image/jpeg,image/png" className="hidden" onChange={handleAvatarChange} />
             </div>
-          )}
-          <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-            <span className="text-white text-xs font-medium">Change cover</span>
           </div>
-          <input ref={coverRef} type="file" accept="image/jpeg,image/png" className="hidden" onChange={handleCoverChange} />
+
+          <div>
+            <p className="label-eyebrow mb-2">Cover image</p>
+            <button
+              type="button"
+              className="w-full border border-dashed border-line rounded-2xl p-5 bg-[var(--paper)] min-h-[122px] flex items-center justify-center text-sm text-[var(--muted)] hover:border-[var(--line-strong)] transition-colors"
+              onClick={() => coverRef.current?.click()}
+            >
+              {coverPreview ? (
+                <img src={coverPreview} alt="Cover preview" className="w-full h-full rounded-xl object-cover min-h-[78px]" />
+              ) : (
+                <span>+ Add a 1500x500 cover</span>
+              )}
+            </button>
+            <input ref={coverRef} type="file" accept="image/jpeg,image/png" className="hidden" onChange={handleCoverChange} />
+          </div>
         </div>
 
-        {/* Avatar */}
-        <div className="flex items-end gap-4 -mt-10 px-4">
-          <div
-            className="relative w-20 h-20 rounded-full border-4 border-paper bg-[var(--paper-2)] overflow-hidden cursor-pointer flex-none group"
-            onClick={() => avatarRef.current?.click()}
-          >
-            {avatarPreview ? (
-              <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-[var(--muted)]">
-                  <circle cx="12" cy="8" r="4"/>
-                  <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
-                </svg>
-              </div>
-            )}
-            <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-full">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-                <circle cx="12" cy="13" r="4"/>
-              </svg>
+        <div className="space-y-6">
+          <div>
+            <label className="label-eyebrow block mb-2">Display name</label>
+            <input
+              type="text"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              placeholder="Your name or brand name"
+              maxLength={60}
+              className="input w-full"
+            />
+          </div>
+
+          <div>
+            <label className="label-eyebrow block mb-2">Username · @handle</label>
+            <div className="input h-12 px-0 flex items-center overflow-hidden">
+              <span className="px-4 text-sm text-[var(--muted)] border-r border-line">reach.app/</span>
+              <input
+                type="text"
+                value={handle}
+                onChange={(e) => setHandle(e.target.value.replace(/\s+/g, "."))}
+                placeholder="maya.kapoor"
+                maxLength={40}
+                className="h-full flex-1 px-3 text-sm bg-transparent outline-none"
+              />
+              {canShowHandleStatus && (
+                <span className="px-4 text-xs text-[var(--green)] mono whitespace-nowrap">✓ Yours</span>
+              )}
             </div>
-            <input ref={avatarRef} type="file" accept="image/jpeg,image/png" className="hidden" onChange={handleAvatarChange} />
           </div>
-          <p className="text-xs text-[var(--muted)] pb-1">JPG or PNG, max 5MB</p>
-        </div>
 
-        {/* Display name */}
-        <div>
-          <label className="label-eyebrow block mb-1.5">Display name *</label>
-          <input
-            type="text"
-            value={displayName}
-            onChange={(e) => setDisplayName(e.target.value)}
-            placeholder="Your name or brand name"
-            maxLength={60}
-            className="input w-full"
-          />
-        </div>
-
-        {/* Bio */}
-        <div>
-          <div className="flex items-center justify-between mb-1.5">
-            <label className="label-eyebrow">Bio *</label>
-            <span className={`text-xs mono ${bio.length > MAX_BIO * 0.9 ? "text-[var(--amber)]" : "text-[var(--muted)]"}`}>
-              {bio.length}/{MAX_BIO}
-            </span>
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="label-eyebrow">Bio</label>
+              <span className={`text-xs mono ${bio.length > MAX_BIO * 0.9 ? "text-[var(--amber)]" : "text-[var(--muted)]"}`}>
+                {bio.length} / {MAX_BIO}
+              </span>
+            </div>
+            <textarea
+              value={bio}
+              onChange={(e) => setBio(e.target.value.slice(0, MAX_BIO))}
+              placeholder="Tell brands what you do and who your audience is..."
+              rows={4}
+              className="input w-full resize-none"
+            />
+            <p className="mt-2 text-xs text-[var(--muted)]">
+              <span className="text-[var(--brand-deep)] italic mr-1">Pro tip:</span>
+              Lead with what you make, not how many followers. Brands care about craft.
+            </p>
           </div>
-          <textarea
-            value={bio}
-            onChange={(e) => setBio(e.target.value.slice(0, MAX_BIO))}
-            placeholder="Tell brands what you do and who your audience is…"
-            rows={4}
-            className="input w-full resize-none"
-          />
+
+          <div className="inline-flex items-center gap-2 px-3 h-8 rounded-full border border-line bg-white text-xs text-[var(--ink)]">
+            <span aria-hidden>✦</span>
+            <span>Auto-saves to your draft</span>
+          </div>
         </div>
       </div>
 
       <StepFooter
+        backHref="/signup"
         onContinue={handleContinue}
         continueDisabled={!canContinue}
+        continueLabel="Continue →"
         loading={uploading}
       />
     </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { StepHeader } from "@/components/onboarding/StepHeader";
 import { StepFooter } from "@/components/onboarding/StepFooter";
@@ -8,18 +8,34 @@ import { useAutoSave } from "@/lib/hooks/useAutoSave";
 import { api } from "@/lib/api/client";
 
 const PLATFORMS = [
-  { key: "instagram", label: "Instagram", hint: "@yourhandle", icon: "📸" },
-  { key: "youtube",   label: "YouTube",   hint: "youtube.com/c/yourchannel", icon: "▶️" },
-  { key: "tiktok",    label: "TikTok",    hint: "@yourhandle", icon: "🎵" },
-  { key: "x",         label: "X (Twitter)", hint: "@yourhandle", icon: "𝕏" },
-  { key: "linkedin",  label: "LinkedIn",  hint: "linkedin.com/in/yourprofile", icon: "💼" },
+  { key: "instagram", label: "Instagram", hint: "@handle", sub: "Most booked", icon: "◎", dark: true },
+  { key: "youtube", label: "YouTube", hint: "your channel", sub: "Long-form", icon: "▣", dark: true },
+  { key: "tiktok", label: "TikTok", hint: "@handle", sub: "Short-form", icon: "♪" },
+  { key: "x", label: "X · Twitter", hint: "@handle", sub: "Optional", icon: "⊕" },
+  { key: "linkedin", label: "LinkedIn", hint: "profile URL", sub: "B2B audience", icon: "⊕" },
 ];
 
 export default function PlatformsStep() {
   const router = useRouter();
   const [handles, setHandles] = useState<Record<string, string>>({});
+  const [hydrated, setHydrated] = useState(false);
 
-  useAutoSave("/onboarding/platforms", { platforms: handles });
+  useEffect(() => {
+    async function hydrateFromBackend() {
+      try {
+        const progress = await api.get<{ platforms: Record<string, string> | null }>("/onboarding/progress");
+        setHandles(progress.platforms ?? {});
+      } catch {
+        setHandles({});
+      } finally {
+        setHydrated(true);
+      }
+    }
+
+    void hydrateFromBackend();
+  }, []);
+
+  useAutoSave("/onboarding/platforms", { platforms: handles }, hydrated);
 
   const filledCount = Object.values(handles).filter((v) => v.trim()).length;
   const canContinue = filledCount >= 1;
@@ -38,46 +54,72 @@ export default function PlatformsStep() {
       <StepHeader
         step={2}
         total={7}
-        title="Connect your platforms"
-        subtitle="Add at least one social platform so brands can see your reach."
+        title={
+          <>
+            Where do you <span className="serif text-brand">publish?</span>
+          </>
+        }
+        subtitle="Link the platforms you create on. Brands use these to verify reach and match relevance."
       />
 
-      <div className="flex-1 max-w-2xl mx-auto w-full px-6 pb-6 flex flex-col gap-3">
-        {/* Connected count */}
-        {filledCount > 0 && (
-          <div className="flex items-center gap-2 mb-1">
-            <span className="pill green">{filledCount} connected</span>
-          </div>
-        )}
-
+      <div className="flex-1 max-w-6xl mx-auto w-full px-6 pb-6 flex flex-col gap-3">
         {PLATFORMS.map((p) => (
-          <div key={p.key} className="card p-4 flex items-center gap-4">
-            <span className="text-2xl w-8 text-center flex-none">{p.icon}</span>
+          <div key={p.key} className="bg-white border border-line rounded-2xl px-4 py-3.5 flex items-center gap-4">
+            <span
+              className={`w-9 h-9 rounded-xl flex items-center justify-center text-sm flex-none ${
+                p.dark ? "bg-ink text-white" : "bg-[var(--paper-2)] text-ink"
+              }`}
+            >
+              {p.icon}
+            </span>
+
+            <div className="w-[124px] flex-none">
+              <p className="text-base font-medium text-ink">{p.label}</p>
+              <p className="text-xs text-[var(--muted)] mt-0.5">{p.sub}</p>
+            </div>
+
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-ink mb-1">{p.label}</p>
               <input
                 type="text"
                 value={handles[p.key] ?? ""}
                 onChange={(e) => setHandle(p.key, e.target.value)}
                 placeholder={p.hint}
-                className="input h-10 text-sm"
+                className="input h-10 text-sm rounded-xl"
               />
             </div>
-            {handles[p.key]?.trim() && (
-              <span className="w-5 h-5 rounded-full bg-[var(--green)] flex items-center justify-center flex-none">
-                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                  <path d="M2 5l2 2 4-4" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </span>
-            )}
+
+            {(p.key === "instagram" || p.key === "youtube") ? (
+              <button
+                type="button"
+                onClick={() => setHandle(p.key, "")}
+                className="w-9 h-9 rounded-full border border-line text-[var(--muted)] hover:text-ink hover:border-[var(--line-strong)] transition-colors flex items-center justify-center"
+                aria-label={`Clear ${p.label}`}
+              >
+                ×
+              </button>
+            ) : <span className="w-9 h-9 flex-none" />}
           </div>
         ))}
+
+        <button
+          type="button"
+          className="self-start mt-1 px-4 h-12 rounded-2xl border border-line bg-white text-ink text-sm font-medium hover:border-[var(--line-strong)] transition-colors"
+        >
+          + Add another platform
+        </button>
+
+        <div className="mt-2 h-12 rounded-xl border border-line bg-white px-4 flex items-center text-sm text-ink">
+          <span className="text-[var(--brand-deep)] mr-3">◌</span>
+          <span>We never post on your behalf. Linking is for verification + audience match only.</span>
+        </div>
       </div>
 
       <StepFooter
         backHref="/onboarding/profile"
         onContinue={handleContinue}
         continueDisabled={!canContinue}
+        continueLabel="Continue →"
+        centerText={filledCount > 0 ? `${filledCount} connected · you're good` : ""}
       />
     </div>
   );

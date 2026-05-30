@@ -9,7 +9,7 @@ from app.core.database import get_db
 from app.models.creator_profile import CreatorProfile
 from app.models.package import Package, PackageAddon
 from app.models.user import User
-from app.schemas.package import PackageResponse, PackagesPatch
+from app.schemas.package import PackageAddonResponse, PackageResponse, PackagesPatch
 
 router = APIRouter(tags=["packages"])
 
@@ -59,6 +59,26 @@ def get_my_packages(
             is_active=p.is_active,
         )
         for p in packages
+    ]
+
+
+@router.get("/packages/addons/my", response_model=list[PackageAddonResponse])
+def get_my_package_addons(
+    current_user: User = Depends(get_current_creator),
+    db: Session = Depends(get_db),
+):
+    addons = db.query(PackageAddon).filter(
+        PackageAddon.creator_id == current_user.id,
+    ).all()
+    return [
+        PackageAddonResponse(
+            id=str(a.id),
+            key=a.key,
+            label=a.label,
+            price=a.price,
+            is_active=a.is_active,
+        )
+        for a in addons
     ]
 
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { StepHeader } from "@/components/onboarding/StepHeader";
 import { StepFooter } from "@/components/onboarding/StepFooter";
@@ -19,8 +19,24 @@ export default function LanguagesStep() {
   const [selected, setSelected] = useState<string[]>([]);
   const [customInput, setCustomInput] = useState("");
   const [showCustom, setShowCustom] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
 
-  useAutoSave("/onboarding/languages", { languages: selected });
+  useEffect(() => {
+    async function hydrateFromBackend() {
+      try {
+        const progress = await api.get<{ languages: string[] | null }>("/onboarding/progress");
+        setSelected(progress.languages ?? []);
+      } catch {
+        setSelected([]);
+      } finally {
+        setHydrated(true);
+      }
+    }
+
+    void hydrateFromBackend();
+  }, []);
+
+  useAutoSave("/onboarding/languages", { languages: selected }, hydrated);
 
   const canContinue = selected.length >= 1;
 

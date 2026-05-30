@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { StepHeader } from "@/components/onboarding/StepHeader";
 import { StepFooter } from "@/components/onboarding/StepFooter";
@@ -35,8 +35,24 @@ const GENRE_GROUPS = [
 export default function GenresStep() {
   const router = useRouter();
   const [selected, setSelected] = useState<string[]>([]);
+  const [hydrated, setHydrated] = useState(false);
 
-  useAutoSave("/onboarding/genres", { genres: selected });
+  useEffect(() => {
+    async function hydrateFromBackend() {
+      try {
+        const progress = await api.get<{ genres: string[] | null }>("/onboarding/progress");
+        setSelected(progress.genres ?? []);
+      } catch {
+        setSelected([]);
+      } finally {
+        setHydrated(true);
+      }
+    }
+
+    void hydrateFromBackend();
+  }, []);
+
+  useAutoSave("/onboarding/genres", { genres: selected }, hydrated);
 
   function toggle(genre: string) {
     setSelected((prev) => {

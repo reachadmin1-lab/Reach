@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { StepHeader } from "@/components/onboarding/StepHeader";
 import { StepFooter } from "@/components/onboarding/StepFooter";
 import { api } from "@/lib/api/client";
 import { createClient } from "@/lib/supabase/client";
+import { RadarMotif } from "@/components/shared/RadarMotif";
 
 const SECTIONS = [
   { label: "Basic Profile",  href: "/onboarding/profile",   key: "profile" },
@@ -17,10 +18,86 @@ const SECTIONS = [
   { label: "Packages",       href: "/onboarding/packages",  key: "packages" },
 ];
 
+interface ProgressResponse {
+  display_name: string | null;
+  bio: string | null;
+  platforms: Record<string, string>;
+  languages: string[];
+  genres: string[];
+}
+
+interface PackageItem {
+  id: string;
+  tier: string;
+  price: number;
+}
+
+interface PortfolioItem {
+  id: string;
+}
+
 export default function ReviewStep() {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [displayName, setDisplayName] = useState("Your profile");
+  const [handle, setHandle] = useState("yourhandle");
+  const [bio, setBio] = useState("Your bio preview will appear here.");
+  const [languages, setLanguages] = useState<string[]>([]);
+  const [genres, setGenres] = useState<string[]>([]);
+  const [platformCount, setPlatformCount] = useState(0);
+  const [packages, setPackages] = useState<PackageItem[]>([]);
+  const [portfolioCount, setPortfolioCount] = useState(0);
+
+  useEffect(() => {
+    async function loadPreviewData() {
+      try {
+        const supabase = createClient();
+        const [{ data: userData }, progress, packageData, portfolioData] = await Promise.all([
+          supabase.auth.getUser(),
+          api.get<ProgressResponse>("/onboarding/progress"),
+          api.get<PackageItem[]>("/packages/my").catch(() => []),
+          api.get<PortfolioItem[]>("/onboarding/portfolio").catch(() => []),
+        ]);
+
+        const metadata = userData.user?.user_metadata as Record<string, unknown> | undefined;
+        const metaHandle = String(metadata?.handle ?? "").trim();
+        const name = String(progress.display_name ?? metadata?.full_name ?? "").trim();
+        const profileBio = String(progress.bio ?? "").trim();
+
+        setDisplayName(name || "Your profile");
+        setHandle(metaHandle || "yourhandle");
+        setBio(profileBio || "Your bio preview will appear here.");
+        setLanguages(progress.languages || []);
+        setGenres(progress.genres || []);
+        setPlatformCount(Object.keys(progress.platforms || {}).length);
+        setPackages(Array.isArray(packageData) ? packageData : []);
+        setPortfolioCount(Array.isArray(portfolioData) ? portfolioData.length : 0);
+      } catch {
+        // Keep non-blocking fallbacks
+      }
+    }
+
+    void loadPreviewData();
+  }, []);
+
+  const initials = useMemo(() => {
+    const tokens = displayName.trim().split(/\s+/).filter(Boolean);
+    const raw = tokens.slice(0, 2).map((t) => t[0]).join("");
+    return (raw || "YR").toUpperCase();
+  }, [displayName]);
+
+  const packageRows = useMemo(() => {
+    if (!packages.length) return [];
+    const order = ["basic", "standard", "premium", "campaign"];
+    return packages
+      .slice()
+      .sort((a, b) => order.indexOf(a.tier) - order.indexOf(b.tier))
+      .map((p) => ({
+        label: p.tier.charAt(0).toUpperCase() + p.tier.slice(1),
+        price: `₹${Math.round((p.price || 0) / 100).toLocaleString("en-IN")}`,
+      }));
+  }, [packages]);
 
   async function handleSubmit() {
     setError("");
@@ -48,57 +125,67 @@ export default function ReviewStep() {
       <StepHeader
         step={7}
         total={7}
-        title="Review your profile"
-        subtitle="Everything look good? Submit for review and we'll get back to you within 24 hours."
+        title={
+          <>
+            Looking <span className="serif text-brand">sharp.</span> One last look.
+          </>
+        }
+        subtitle="This is exactly what brands will see when they land on your booking link."
       />
 
-      <div className="flex-1 max-w-3xl mx-auto w-full px-6 pb-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="flex-1 max-w-6xl mx-auto w-full px-6 pb-6">
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_270px] gap-6">
           {/* Left — profile preview card */}
-          <div className="card flex flex-col gap-4">
-            <p className="label-eyebrow">Profile preview</p>
+          <div className="card p-0 overflow-hidden">
+            <div className="relative h-[138px] bg-ink overflow-hidden">
+              <RadarMotif />
+            </div>
 
-            {/* Mini hero */}
-            <div className="relative h-20 rounded-xl bg-[var(--paper-2)] overflow-hidden">
-              <div className="absolute bottom-0 left-4 translate-y-1/2">
-                <div className="w-14 h-14 rounded-full border-2 border-white bg-[var(--paper-3)] flex items-center justify-center">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-[var(--muted)]">
-                    <circle cx="12" cy="8" r="4"/>
-                    <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
-                  </svg>
+            <div className="p-5">
+              <div className="flex items-start gap-3">
+                <div className="w-14 h-14 rounded-full bg-brand text-white text-xl font-semibold flex items-center justify-center">
+                  {initials}
+                </div>
+                <div>
+                  <p className="font-semibold text-ink text-lg">{displayName}</p>
+                  <p className="text-xs text-[var(--muted)] mt-0.5">reach.app/@{handle}</p>
                 </div>
               </div>
-            </div>
 
-            <div className="pt-6">
-              <p className="font-semibold text-ink">Your display name</p>
-              <p className="text-xs text-[var(--muted)] mt-0.5">@yourhandle · India</p>
-              <p className="text-sm text-[var(--muted)] mt-2 line-clamp-2">
-                Your bio will appear here once you&apos;ve filled it in.
+              <p className="text-sm text-ink mt-4">
+                {bio}
               </p>
-            </div>
 
-            <div className="flex flex-wrap gap-2 pt-1">
-              <span className="pill">Travel</span>
-              <span className="pill">Fashion</span>
-              <span className="pill">Lifestyle</span>
-            </div>
+              <div className="flex flex-wrap gap-2 pt-3">
+                {genres.length > 0 ? (
+                  genres.slice(0, 3).map((genre) => <span key={genre} className="pill">{genre}</span>)
+                ) : (
+                  <span className="pill">No genres selected</span>
+                )}
+              </div>
 
-            <div className="border-t border-line pt-3 grid grid-cols-3 gap-2 text-center">
-              {[["Reach", "—"], ["Engagement", "—"], ["On time", "—"]].map(([label, val]) => (
-                <div key={label}>
-                  <p className="mono text-sm font-semibold text-ink">{val}</p>
-                  <p className="text-[10px] text-[var(--muted)]">{label}</p>
+              <div className="border-t border-line mt-4 pt-4">
+                <p className="text-[11px] uppercase tracking-[0.1em] mono text-[var(--muted)] mb-2">
+                  Packages · {packageRows.length ? `${packageRows.length} tiers` : "not added"}
+                </p>
+                <div className="space-y-2">
+                  {(packageRows.length ? packageRows : [{ label: "Basic", price: "₹0" }, { label: "Standard", price: "₹0" }]).map(({ label, price }) => (
+                    <div key={label} className="h-10 rounded-lg bg-[var(--paper)] border border-line px-3 flex items-center justify-between">
+                      <span className="text-sm text-ink">{label}</span>
+                      <span className="text-sm font-semibold text-ink">{price}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              </div>
             </div>
           </div>
 
           {/* Right — section checklist */}
           <div className="flex flex-col gap-3">
-            <p className="label-eyebrow">Sections</p>
+            <p className="label-eyebrow">Section checklist</p>
             {SECTIONS.map((s) => (
-              <div key={s.key} className="flex items-center justify-between py-2.5 border-b border-line last:border-0">
+              <div key={s.key} className="bg-white border border-line rounded-2xl px-4 py-3">
+                <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <span className="w-5 h-5 rounded-full bg-[var(--green)] flex items-center justify-center flex-none">
                     <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
@@ -111,13 +198,23 @@ export default function ReviewStep() {
                   EDIT
                 </Link>
               </div>
+                <p className="text-xs text-[var(--muted)] mt-1.5 ml-8">
+                  {s.key === "profile" && `${displayName} · @${handle}`}
+                  {s.key === "platforms" && `${platformCount} connected`}
+                  {s.key === "languages" && (languages.length ? languages.join(", ") : "None selected")}
+                  {s.key === "genres" && `${genres.length} selected`}
+                  {s.key === "portfolio" && (portfolioCount > 0 ? `${portfolioCount} items` : "No items added")}
+                  {s.key === "packages" && `${packageRows.length || 0} tiers`}
+                </p>
+              </div>
             ))}
 
             {/* Ready to publish card */}
-            <div className="mt-2 rounded-[18px] bg-ink text-white p-5">
-              <p className="text-sm font-semibold mb-1">Ready to publish</p>
-              <p className="text-xs text-[var(--muted-dark)]">
-                Your profile will be reviewed by our team. You&apos;ll be notified once it&apos;s live.
+            <div className="mt-1 rounded-[18px] bg-ink text-white p-5 relative overflow-hidden">
+              <RadarMotif />
+              <p className="label-eyebrow text-[var(--muted-dark)] mb-2 relative z-10">Ready to publish</p>
+              <p className="text-sm text-white/90 relative z-10">
+                We&apos;ll review your profile in 24-48 hours. You&apos;ll get an email + push when you&apos;re live.
               </p>
             </div>
 
@@ -133,7 +230,7 @@ export default function ReviewStep() {
       <StepFooter
         backHref="/onboarding/packages"
         onContinue={handleSubmit}
-        continueLabel="Submit for review"
+        continueLabel="Submit for review →"
         loading={submitting}
       />
     </div>

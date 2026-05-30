@@ -46,9 +46,9 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/brand/dashboard", request.url));
   }
 
-  // Creator users → force onboarding if not completed
+  // Creator users → force onboarding flow if not completed
   if (role === "creator" && !onboardingComplete && !pathname.startsWith("/onboarding")) {
-    return NextResponse.redirect(new URL("/onboarding/profile", request.url));
+    return NextResponse.redirect(new URL("/onboarding", request.url));
   }
 
   return response;

@@ -1,8 +1,55 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { RadarMotif } from "@/components/shared/RadarMotif";
 import { ReachMark } from "@/components/shared/ReachMark";
+import { createClient } from "@/lib/supabase/client";
+import { api } from "@/lib/api/client";
+
+interface ProgressResponse {
+  display_name: string | null;
+}
 
 export default function SubmittedPage() {
+  const [displayName, setDisplayName] = useState("Your profile");
+  const [handle, setHandle] = useState("yourhandle");
+
+  useEffect(() => {
+    async function loadIdentity() {
+      try {
+        const supabase = createClient();
+        const [{ data: userData }, progress] = await Promise.all([
+          supabase.auth.getUser(),
+          api.get<ProgressResponse>("/onboarding/progress"),
+        ]);
+
+        const metadata = userData.user?.user_metadata as Record<string, unknown> | undefined;
+        const rawHandle = String(metadata?.handle ?? "").trim();
+        const rawName = String(progress.display_name ?? metadata?.full_name ?? "").trim();
+
+        if (rawName) setDisplayName(rawName);
+        if (rawHandle) setHandle(rawHandle);
+      } catch {
+        try {
+          const supabase = createClient();
+          const { data: userData } = await supabase.auth.getUser();
+          const metadata = userData.user?.user_metadata as Record<string, unknown> | undefined;
+          const rawHandle = String(metadata?.handle ?? "").trim();
+          const rawName = String(metadata?.full_name ?? "").trim();
+          if (rawName) setDisplayName(rawName);
+          if (rawHandle) setHandle(rawHandle);
+        } catch {
+          // Keep safe fallbacks
+        }
+      }
+    }
+
+    void loadIdentity();
+  }, []);
+
+  const profileLabel = useMemo(() => displayName || "Your profile", [displayName]);
+
   return (
     <div className="min-h-screen bg-ink text-white flex flex-col items-center justify-center px-6 relative overflow-hidden">
       <RadarMotif />
@@ -35,8 +82,8 @@ export default function SubmittedPage() {
               </svg>
             </div>
             <div>
-              <p className="text-sm font-medium text-white">Your profile</p>
-              <p className="text-xs text-[var(--muted-dark)]">@yourhandle</p>
+              <p className="text-sm font-medium text-white">{profileLabel}</p>
+              <p className="text-xs text-[var(--muted-dark)]">@{handle}</p>
             </div>
             <span className="ml-auto pill outline-dark text-[10px] h-5 px-2">Under review</span>
           </div>

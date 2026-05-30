@@ -1,8 +1,10 @@
+import { ReactNode } from "react";
+
 interface StepHeaderProps {
   step: number;
   total: number;
-  title: string;
-  subtitle?: string;
+  title: ReactNode;
+  subtitle?: ReactNode;
 }
 
 export function StepHeader({ step, total, title, subtitle }: StepHeaderProps) {

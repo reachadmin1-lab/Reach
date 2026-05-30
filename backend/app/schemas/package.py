@@ -36,3 +36,13 @@ class PackageResponse(BaseModel):
     is_active: bool
 
     model_config = {"from_attributes": True}
+
+
+class PackageAddonResponse(BaseModel):
+    id: str
+    key: str
+    label: str
+    price: int
+    is_active: bool
+
+    model_config = {"from_attributes": True}
