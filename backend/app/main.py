@@ -14,6 +14,7 @@ allowed_origins = {
     settings.app_url.rstrip("/"),
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "https://reach-ten-blond.vercel.app",
 }
 
 app.add_middleware(
