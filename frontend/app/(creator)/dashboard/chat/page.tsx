@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { api } from "@/lib/api/client";
 import { createClient } from "@/lib/supabase/client";
@@ -43,6 +43,14 @@ function initials(name: string) {
 }
 
 export default function ChatPage() {
+  return (
+    <Suspense fallback={<div className="flex-1 flex items-center justify-center"><div className="w-5 h-5 border-2 border-line border-t-brand rounded-full animate-spin" /></div>}>
+      <ChatPageInner />
+    </Suspense>
+  );
+}
+
+function ChatPageInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [threads, setThreads] = useState<Thread[]>([]);

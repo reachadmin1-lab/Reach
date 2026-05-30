@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { api } from "@/lib/api/client";
@@ -39,6 +39,14 @@ function timeAgo(iso: string) {
 const FILTERS = ["All", "Active", "Sign-off", "Done", "Pending"];
 
 export default function BrandOrdersPage() {
+  return (
+    <Suspense fallback={<div className="flex-1 flex items-center justify-center"><div className="w-5 h-5 border-2 border-line border-t-brand rounded-full animate-spin" /></div>}>
+      <BrandOrdersPageInner />
+    </Suspense>
+  );
+}
+
+function BrandOrdersPageInner() {
   const searchParams = useSearchParams();
   const defaultFilter = searchParams.get("filter") === "signoff" ? "Sign-off" : "All";
   const [orders, setOrders] = useState<Order[]>([]);
